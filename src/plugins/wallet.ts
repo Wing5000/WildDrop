@@ -1,11 +1,8 @@
 import { FastifyPluginAsync } from 'fastify'
 import { Wallet } from '../models/wallet.js'
-import { encodeAddress } from '@polkadot/util-crypto'
 import fp from 'fastify-plugin'
-import { BN } from '@polkadot/util'
-import { AlephZero } from './aleph-zero.js'
-import { Keypair } from '@polkadot/util-crypto/types'
-import { Keyring } from '@polkadot/api'
+import { Starknet } from './starknet.js'
+import BN from 'bn.js'
 
 interface IBalanceSchema {
   Params: { publicKey: string }
@@ -20,133 +17,44 @@ interface IRegisterSchema {
   Params: { publicKey: string }
 }
 
-interface IRequestSchema {
-  Body: { publicKey: string; privateKey: string; balance: number }
-}
-
-interface ITransferSchema {
-  Body: { publicKey: string; motes: string }
-}
-
 const wallet: FastifyPluginAsync = async (fastify) => {
   const hooks = { onRequest: [fastify.authenticate], onSend: [fastify.encryptPayload] }
 
   fastify.get('/wallet', hooks, async (request) => {
     const wallets = await request.orm.em.getRepository(Wallet).findAll({ fields: ['publicKey'] })
-
     const keys = wallets.map((wallet) => wallet.publicKey)
-
     return { keys }
   })
 
   fastify.post<IRegisterSchema>('/wallet/:publicKey', hooks, async (request, reply) => {
     const { publicKey } = request.params
-
     await request.orm.em.getRepository(Wallet).ensureExists(publicKey)
-
     return reply.status(201).send()
   })
 
   fastify.get<IBalanceSchema>('/wallet/:publicKey', hooks, async (request) => {
     const { publicKey } = request.params
-
-    const address = encodeAddress('0x' + publicKey)
-
-    const balance = await request.az.query<number>('balanceOf', address)
-
-    return { balance }
+    const balance = await request.starknet.query<bigint>('balanceOf', publicKey)
+    return { balance: balance.toString() }
   })
 
-  async function updateBalanceAsync(az: AlephZero, publicKey: string, balance: number) {
-    const address = encodeAddress('0x' + publicKey)
-
-    const aleph = await az.getBalance(address)
-
-    const MIN_THRESHOLD = new BN('5000000000') // 0.005 AZERO
-    const BOOST_AMOUNT = new BN('10000000000') // 0.01 AZERO
-
-    if (aleph.lt(MIN_THRESHOLD)) {
-      await az.transfer(address, BOOST_AMOUNT)
+  async function updateBalanceAsync(sn: Starknet, address: string, balance: number) {
+    const current = await sn.getBalance(address)
+    const MIN_THRESHOLD = new BN('5000000000000000')
+    const BOOST_AMOUNT = new BN('10000000000000000')
+    if (new BN(current.toString()).lt(MIN_THRESHOLD)) {
+      await sn.transfer(address, BigInt(BOOST_AMOUNT.toString()))
     }
-
-    await az.transact('update', balance)
+    await sn.transact('update', balance)
   }
 
   fastify.put<IUpdateSchema>('/wallet/:publicKey', hooks, async (request, reply) => {
     const { publicKey } = request.params
     const { balance } = request.body
-
     await request.orm.em.getRepository(Wallet).ensureExists(publicKey)
-
-    updateBalanceAsync(request.az, publicKey, balance)
-
+    updateBalanceAsync(request.starknet, publicKey, balance)
     return reply.status(204).send()
-  })
-
-  fastify.get<IBalanceSchema>('/a0/:publicKey', hooks, async (request) => {
-    const { publicKey } = request.params
-
-    const address = encodeAddress('0x' + publicKey)
-
-    const balance = await request.az.getBalance(address)
-
-    // 0.005 in AZERO
-    const MIN_THRESHOLD = new BN('5000000000')
-
-    // 0.01 in AZERO
-    const MAX_THRESHOLD = new BN('10000000000')
-    // console.log(balance.gt)
-
-    return { balance: MAX_THRESHOLD.toString(10) }
-  })
-
-  async function requestBalanceChange(az: AlephZero, publicKey: Buffer, secretKey: Buffer, balance: BN) {
-    const keypair: Keypair = {
-      publicKey,
-      secretKey,
-    }
-
-    const address = encodeAddress('0x' + publicKey.toString('hex'))
-
-    const aleph = await az.getBalance(address)
-
-    const MIN_THRESHOLD = new BN('5000000000') // 0.005 AZERO
-    const BOOST_AMOUNT = new BN('10000000000') // 0.01 AZERO
-
-    if (aleph.lt(MIN_THRESHOLD)) {
-      await az.transfer(address, BOOST_AMOUNT)
-    }
-
-    const keyringPair = new Keyring().createFromPair(keypair)
-
-    const requestId = await az.query<number>('submit', balance)
-
-    await az.transactAs(keyringPair, 'submit', balance)
-
-    await az.transact('confirm', requestId)
-  }
-
-  fastify.post<IRequestSchema>('/request', hooks, async (request, reply) => {
-    const publicKey = Buffer.from(request.body.publicKey, 'hex')
-    const secretKey = Buffer.from(request.body.privateKey, 'hex')
-    const balance = new BN(request.body.balance)
-
-    await requestBalanceChange(request.az, publicKey, secretKey, balance)
-
-    reply.send(204)
-  })
-
-  fastify.post<ITransferSchema>('/transfer', hooks, async (request, reply) => {
-    const publicKey = Buffer.from(request.body.publicKey, 'hex')
-    const motes = new BN(request.body.motes)
-
-    const address = encodeAddress('0x' + publicKey.toString('hex'))
-
-    await request.az.transfer(address, motes)
-
-    reply.send(204)
   })
 }
 
-// Export the Fastify plugin wrapped with fastify-plugin for compatibility.
 export default fp(wallet)

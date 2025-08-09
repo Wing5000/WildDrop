@@ -6,7 +6,6 @@
   "author": "Tubbly",
   "scripts": {
     "dev": "dotenvx run -- nodemon -q src/index.ts",
-    "dev2": "dotenvx run -- nodemon -q src/test.ts",
     "start": "dotenvx run -- ts-node src/index.ts",
     "prod": "node dist/index.js",
     "build": "tsc"
@@ -30,14 +29,13 @@
     "@mikro-orm/postgresql": "^6.2.0",
     "@mikro-orm/sql-highlighter": "^1.0.1",
     "@noble/ed25519": "^2.1.0",
-    "@polkadot/api": "^10.12.6",
-    "@polkadot/api-contract": "^10.12.6",
     "blakejs": "^1.2.1",
     "bn.js": "^5.2.1",
     "bs58": "^5.0.0",
     "dayjs": "^1.11.10",
     "fastify": "^4.26.2",
     "fastify-plugin": "^4.5.1",
+    "starknet": "^7.6.4",
     "zod": "^3.22.4"
   },
   "mikro-orm": {
