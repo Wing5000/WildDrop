@@ -14,7 +14,7 @@ Keep in mind that this project is currently in a work-in-progress state. While w
 
 ## Features:
 
-- **Secure Storage**: Utilizes AlephZero blockchain technology for immutable and tamper-proof storage of crypto assets.
+- **Secure Storage**: Utilizes Starknet blockchain technology for immutable and tamper-proof storage of crypto assets.
 - **API Integration**: Provides a RESTful API for seamless integration with external applications and services.
 - **Scalable Architecture**: Built on NodeJS for scalability, allowing the service to handle increasing demands effortlessly.
 - **Private Key Management**: Implements robust encryption techniques for safeguarding private keys.
@@ -57,10 +57,10 @@ Please be advised that you have the option to utilize Docker to run our project 
    | DB_NAME          | PostgreSQL database name       | wilddrop                |
    | DB_USER          | PostgreSQL user name           | wilddrop                |
    | DB_PASS          | PostgreSQL user password       | wilddrop                |
-   | AZ_CONTRACT      | AlephZero contract hash        |                         |
-   | AZ_ACCOUNT_PATH  | Path to account.json           |                         |
-   | AZ_METADATA_PATH | Path to contract metadata.json |                         |
-   | AZ_URL           | AlephZero node                 | wss://ws.test.azero.dev |
+   | STARKNET_RPC_URL       | Starknet RPC endpoint           |                         |
+   | STARKNET_ACCOUNT_ADDRESS | Account address                |                         |
+   | STARKNET_PRIVATE_KEY    | Private key for the account    |                         |
+   | STARKNET_CONTRACT_ADDRESS | Deployed contract address    |                         |
 
 4. Install dependencies:  
    `yarn`
