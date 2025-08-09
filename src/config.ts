@@ -12,15 +12,9 @@ export const DB_DEBUG = s2b(process.env.DB_PASS)
 
 export const SESSION_EXPIRE = Number(process.env.SESSION_EXPIRE) || 60
 
-export const AZ_CONTRACT = process.env.AZ_CONTRACT // Contract address.
-export const AZ_ACCOUNT = process.env.AZ_ACCOUNT // Account JSON file encoded as base64.
-export const AZ_ACCOUNT_PATH = process.env.AZ_ACCOUNT_PATH // Used when AC_ACCOUNT is empty.
-export const AZ_METADATA = process.env.AZ_METADATA // Metadata JSON file encoded as base64.
-export const AZ_METADATA_PATH = process.env.AZ_METADATA_PATH
-export const AZ_URL = process.env.AZ_URL
-export const AZ_PASSPHRASE =
-  Buffer.from(process.env.AZ_PASSPHRASE, 'base64').toString('base64') === process.env.AZ_PASSPHRASE
-    ? Buffer.from(process.env.AZ_PASSPHRASE, 'base64').toString('ascii')
-    : process.env.AZ_PASSPHRASE
+export const STARKNET_CONTRACT = process.env.STARKNET_CONTRACT // Contract address.
+export const STARKNET_ACCOUNT_ADDRESS = process.env.STARKNET_ACCOUNT_ADDRESS // Account address.
+export const STARKNET_PRIVATE_KEY = process.env.STARKNET_PRIVATE_KEY // Private key used to sign transactions.
+export const STARKNET_RPC_URL = process.env.STARKNET_RPC_URL // RPC node URL.
 
 export const NODE_ENV: Environment = process.env.NODE_ENV as Environment

@@ -1,11 +1,7 @@
 import { FastifyPluginAsync } from 'fastify'
 import { Wallet } from '../models/wallet.js'
-import { encodeAddress } from '@polkadot/util-crypto'
 import fp from 'fastify-plugin'
-import { BN } from '@polkadot/util'
-import { AlephZero } from './aleph-zero.js'
-import { Keypair } from '@polkadot/util-crypto/types'
-import { Keyring } from '@polkadot/api'
+import { StarkNet } from './starknet.js'
 
 interface IBalanceSchema {
   Params: { publicKey: string }
@@ -49,27 +45,26 @@ const wallet: FastifyPluginAsync = async (fastify) => {
 
   fastify.get<IBalanceSchema>('/wallet/:publicKey', hooks, async (request) => {
     const { publicKey } = request.params
+    const address = publicKey.startsWith('0x') ? publicKey : '0x' + publicKey
 
-    const address = encodeAddress('0x' + publicKey)
-
-    const balance = await request.az.query<number>('balanceOf', address)
+    const balance: any = await request.sn.query('balanceOf', address)
 
     return { balance }
   })
 
-  async function updateBalanceAsync(az: AlephZero, publicKey: string, balance: number) {
-    const address = encodeAddress('0x' + publicKey)
+  async function updateBalanceAsync(sn: StarkNet, publicKey: string, balance: number) {
+    const address = publicKey.startsWith('0x') ? publicKey : '0x' + publicKey
 
-    const aleph = await az.getBalance(address)
+    const eth = await sn.getBalance(address)
 
-    const MIN_THRESHOLD = new BN('5000000000') // 0.005 AZERO
-    const BOOST_AMOUNT = new BN('10000000000') // 0.01 AZERO
+    const MIN_THRESHOLD = 5000000000000000n // 0.005 ETH
+    const BOOST_AMOUNT = 10000000000000000n // 0.01 ETH
 
-    if (aleph.lt(MIN_THRESHOLD)) {
-      await az.transfer(address, BOOST_AMOUNT)
+    if (eth < MIN_THRESHOLD) {
+      await sn.transfer(address, BOOST_AMOUNT)
     }
 
-    await az.transact('update', balance)
+    await sn.transact('update', BigInt(balance))
   }
 
   fastify.put<IUpdateSchema>('/wallet/:publicKey', hooks, async (request, reply) => {
@@ -78,7 +73,7 @@ const wallet: FastifyPluginAsync = async (fastify) => {
 
     await request.orm.em.getRepository(Wallet).ensureExists(publicKey)
 
-    updateBalanceAsync(request.az, publicKey, balance)
+    updateBalanceAsync(request.sn, publicKey, balance)
 
     return reply.status(204).send()
   })
@@ -86,63 +81,47 @@ const wallet: FastifyPluginAsync = async (fastify) => {
   fastify.get<IBalanceSchema>('/a0/:publicKey', hooks, async (request) => {
     const { publicKey } = request.params
 
-    const address = encodeAddress('0x' + publicKey)
+    const address = publicKey.startsWith('0x') ? publicKey : '0x' + publicKey
 
-    const balance = await request.az.getBalance(address)
+    const balance = await request.sn.getBalance(address)
 
-    // 0.005 in AZERO
-    const MIN_THRESHOLD = new BN('5000000000')
-
-    // 0.01 in AZERO
-    const MAX_THRESHOLD = new BN('10000000000')
-    // console.log(balance.gt)
-
-    return { balance: MAX_THRESHOLD.toString(10) }
+    return { balance: balance.toString() }
   })
 
-  async function requestBalanceChange(az: AlephZero, publicKey: Buffer, secretKey: Buffer, balance: BN) {
-    const keypair: Keypair = {
-      publicKey,
-      secretKey,
+  async function requestBalanceChange(
+    sn: StarkNet,
+    publicKey: string,
+    privateKey: string,
+    balance: bigint,
+  ) {
+    const address = publicKey.startsWith('0x') ? publicKey : '0x' + publicKey
+
+    const eth = await sn.getBalance(address)
+    const MIN_THRESHOLD = 5000000000000000n
+    const BOOST_AMOUNT = 10000000000000000n
+    if (eth < MIN_THRESHOLD) {
+      await sn.transfer(address, BOOST_AMOUNT)
     }
 
-    const address = encodeAddress('0x' + publicKey.toString('hex'))
-
-    const aleph = await az.getBalance(address)
-
-    const MIN_THRESHOLD = new BN('5000000000') // 0.005 AZERO
-    const BOOST_AMOUNT = new BN('10000000000') // 0.01 AZERO
-
-    if (aleph.lt(MIN_THRESHOLD)) {
-      await az.transfer(address, BOOST_AMOUNT)
-    }
-
-    const keyringPair = new Keyring().createFromPair(keypair)
-
-    const requestId = await az.query<number>('submit', balance)
-
-    await az.transactAs(keyringPair, 'submit', balance)
-
-    await az.transact('confirm', requestId)
+    const requestId: any = await sn.query('submit', balance)
+    await sn.transactAs(address, privateKey, 'submit', balance)
+    await sn.transact('confirm', requestId)
   }
 
   fastify.post<IRequestSchema>('/request', hooks, async (request, reply) => {
-    const publicKey = Buffer.from(request.body.publicKey, 'hex')
-    const secretKey = Buffer.from(request.body.privateKey, 'hex')
-    const balance = new BN(request.body.balance)
+    const { publicKey, privateKey, balance } = request.body
 
-    await requestBalanceChange(request.az, publicKey, secretKey, balance)
+    await requestBalanceChange(request.sn, publicKey, privateKey, BigInt(balance))
 
     reply.send(204)
   })
 
   fastify.post<ITransferSchema>('/transfer', hooks, async (request, reply) => {
-    const publicKey = Buffer.from(request.body.publicKey, 'hex')
-    const motes = new BN(request.body.motes)
+    const { publicKey, motes } = request.body
+    const address = publicKey.startsWith('0x') ? publicKey : '0x' + publicKey
+    const amount = BigInt(motes)
 
-    const address = encodeAddress('0x' + publicKey.toString('hex'))
-
-    await request.az.transfer(address, motes)
+    await request.sn.transfer(address, amount)
 
     reply.send(204)
   })
